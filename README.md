@@ -1,0 +1,80 @@
+# Max Shipping - Shipping & Receiving Portal
+
+A lightweight browser app for tracking incoming shipments, managing purchase orders, uploading packing slips/POD files, and sending receiving email notifications.
+
+The app now stores shipment data in Supabase and uploads documents/photos to Supabase Storage.
+
+## Key Features
+
+* Order logging for PO numbers, suppliers, items, ordered dates, carriers, and tracking codes.
+* Packing slip, POD, and OSD photo uploads through Supabase Storage.
+* Outlook email notifications from the Receive dialog.
+* Live courier tracking links for common carriers.
+* Shared multi-user data through Supabase instead of a local/shared network folder.
+* Static frontend only: `index.html`, `style.css`, and `app.js`.
+
+## Supabase Setup
+
+Create these tables in the Supabase SQL editor:
+
+```sql
+create table if not exists public.shipping_orders (
+  id bigint primary key,
+  data jsonb not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.shipping_settings (
+  key text primary key,
+  data jsonb not null,
+  updated_at timestamptz not null default now()
+);
+
+create or replace function public.set_updated_at()
+returns trigger as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$ language plpgsql;
+
+drop trigger if exists set_shipping_orders_updated_at on public.shipping_orders;
+create trigger set_shipping_orders_updated_at
+before update on public.shipping_orders
+for each row execute function public.set_updated_at();
+
+drop trigger if exists set_shipping_settings_updated_at on public.shipping_settings;
+create trigger set_shipping_settings_updated_at
+before update on public.shipping_settings
+for each row execute function public.set_updated_at();
+```
+
+Create a Supabase Storage bucket named:
+
+```text
+shipping-files
+```
+
+The app stores files under:
+
+```text
+shipping-files/scans/
+shipping-files/osd/
+```
+
+## App Configuration
+
+In `app.js`, replace these values with your Supabase project values:
+
+```js
+const SUPABASE_URL = 'https://jiwmcrkhpadkzozcdigk.supabase.co';
+const SUPABASE_ANON_KEY = 'YOUR-SUPABASE-PUBLISHABLE-KEY';
+const SUPABASE_STORAGE_BUCKET = 'shipping-files';
+```
+
+For a quick internal setup, enable Row Level Security policies that allow your app users to read/write the two tables and upload/read files in the bucket. For production, use Supabase Auth and restrict policies to signed-in company users.
+
+## Hosting
+
+Host the static files on a secure HTTPS host such as Vercel, Netlify, GitHub Pages, or an internal HTTPS server. Open the hosted URL on each workstation.
